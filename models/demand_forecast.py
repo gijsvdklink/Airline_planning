@@ -1,4 +1,11 @@
+import sys
+import os
+
+# Add the parent directory of `models` to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import pandas as pd
+import numpy as np
 
 # Path to the Excel file
 data_file_path = 'data/DemandGroup16.xlsx'
@@ -41,3 +48,46 @@ print("\nCleaned Transposed Airport Data:")
 print(airport_data_transposed)
 print("\nCleaned Demand Per Week Data:")
 print(demand_per_week)
+
+import sys
+
+
+from utils.distance_calculations import calculate_distance, calculate_distance_matrix
+
+# Extract latitudes and longitudes
+latitudes = airport_data_transposed['Latitude (deg)'].astype(float).values
+longitudes = airport_data_transposed['Longitude (deg)'].astype(float).values
+
+# Extract city names (using the ICAO Code column)
+city_names = airport_data_transposed['ICAO Code'].tolist()
+
+# Calculate the distance matrix using the imported function
+distance_matrix = calculate_distance_matrix(latitudes, longitudes)
+
+# Convert the distance matrix to a DataFrame with city names as both row and column headers
+distance_df = pd.DataFrame(distance_matrix, index=city_names, columns=city_names)
+
+# Round the values to one decimal place
+distance_df = distance_df.round(1)
+
+# Print the full distance matrix
+print("\nDistance Matrix with City Names:")
+print(distance_df)
+
+# Save the full distance matrix to a CSV file
+distance_df.to_csv('distance_matrix_with_city_names.csv', index=True)
+
+# Print only distances from Frankfurt (EDDF)
+print("\nDistances from Frankfurt (EDDF):")
+if "EDDF" in city_names:
+    distances_from_frankfurt = distance_df.loc["EDDF"]  # Extract row for Frankfurt
+    print(distances_from_frankfurt)
+    
+    # Save Frankfurt distances to a separate CSV
+    distances_from_frankfurt.to_csv('distances_from_frankfurt.csv', header=True)
+else:
+    print("Frankfurt (EDDF) not found in city names.")
+
+
+
+    

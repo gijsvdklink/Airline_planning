@@ -23,4 +23,23 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
     return distance
 
+def calculate_distance_matrix(latitudes, longitudes):
+    """
+    Compute the pairwise distance matrix for all airports.
 
+    Parameters:
+        latitudes: List or array of latitudes for all airports.
+        longitudes: List or array of longitudes for all airports.
+
+    Returns:
+        A 2D list where element (i, j) is the distance between airport i and airport j.
+    """
+    num_airports = len(latitudes)
+    distance_matrix = [[0 for _ in range(num_airports)] for _ in range(num_airports)]
+
+    for i in range(num_airports):
+        for j in range(num_airports):
+            if i != j:  # Avoid recalculating for the same airport
+                distance_matrix[i][j] = calculate_distance(latitudes[i], longitudes[i], latitudes[j], longitudes[j])
+
+    return distance_matrix

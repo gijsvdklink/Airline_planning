@@ -1,58 +1,43 @@
-# demand_forecast.py
 import pandas as pd
-import numpy as np
-import statsmodels.api as sm
 
-def load_data():
-    # Load population and GDP data from `pop.xlsx`, skipping rows before the actual headers
-    pop_data = pd.read_excel('data/pop.xlsx', sheet_name=0, header=2)  # Header is in row 3 (index 2)
-    
-    # Print the first few rows to debug and verify
-    print("Preview of pop_data (first few rows):")
-    print(pop_data.head())
+# Path to the Excel file
+data_file_path = 'data/DemandGroup16.xlsx'
 
-    # Select the relevant columns
-    pop_data = pop_data[['City', '2020', '2023', 'Country', '2020.1', '2023.1']]
-    pop_data.columns = ['City', 'Population_2020', 'Population_2023', 'Country', 'GDP_2020', 'GDP_2023']
+# Load the airport_data sheet (skipping irrelevant rows)
+airport_data = pd.read_excel(data_file_path, sheet_name='airport_data', header=None, usecols=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])  # Include the desired columns
 
-    # Print column names after adjustment
-    print("Columns in pop_data after adjustment:", pop_data.columns)
+# Transpose the airport_data
+airport_data_transposed = airport_data.transpose()
 
-    # Load demand data from `DemandGroup16.xlsx`
-    print("Loading demand data...")
-    demand_data = pd.read_excel('data/DemandGroup16.xlsx', sheet_name=0)
+# Set the first row as the column headers
+airport_data_transposed.columns = airport_data_transposed.iloc[0]
 
-    # Extract demand per week, starting from row 13
-    print("Extracting demand data...")
-    demand_per_week = demand_data.iloc[12:]  # Since data starts at row 13 (index 12)
+# Drop the first row (it’s now redundant)
+airport_data_transposed = airport_data_transposed[1:]
 
-    # Rename columns to make them easier to work with
-    demand_per_week.columns = demand_data.iloc[11]  # The actual header is in row 12
-    demand_per_week = demand_per_week.dropna(axis=1, how='all')  # Drop empty columns
+# Load demand_per_week sheet with all rows
+demand_per_week = pd.read_excel(data_file_path, sheet_name='demand_per_week', header=None, usecols=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
 
-    return pop_data, demand_per_week
+# Clean demand_per_week
+demand_per_week.columns = demand_per_week.iloc[0]  # First row becomes column names
+demand_per_week = demand_per_week[1:]  # Exclude the first row from the data
+demand_per_week.index = demand_per_week.iloc[:, 0]  # First column becomes row index (origin airports)
+demand_per_week = demand_per_week.iloc[:, 1:]  # Exclude the first column from data
+demand_per_week = demand_per_week.apply(pd.to_numeric, errors='coerce')  # Convert values to numeric
 
-def calibrate_gravity_model(pop_data, demand_data):
-    # Filter data for 2020
-    pop_2020 = pop_data[pop_data['Population_2020'].notna()]
-    demand_2020 = demand_data[['Origin', 'Destination', 'Demand_2020']]
+# Load the population and GDP data
+pop_data = pd.read_excel('data/pop.xlsx', usecols=[0, 1, 2, 4, 5, 6], skiprows=[0, 1])
 
-    # Merge dataframes to get population, GDP, and demand for corresponding origin and destination
-    merged_data = pd.merge(demand_2020, pop_2020, left_on='Origin', right_on='City', suffixes=('_origin', '_dest'))
-    merged_data = pd.merge(merged_data, pop_2020, left_on='Destination', right_on='City', suffixes=('_origin', '_dest'))
+# Convert Population and GDP columns to numeric in-place
+pop_data[2020] = pd.to_numeric(pop_data[2020], errors='coerce')
+pop_data[2023] = pd.to_numeric(pop_data[2023], errors='coerce')
+pop_data['2020.1'] = pd.to_numeric(pop_data['2020.1'], errors='coerce')
+pop_data['2023.1'] = pd.to_numeric(pop_data['2023.1'], errors='coerce')
 
-    # Apply logarithms to linearize
-    merged_data['Log_Population'] = np.log(merged_data['Population_2020_origin'] * merged_data['Population_2020_dest'])
-    merged_data['Log_GDP'] = np.log(merged_data['GDP_2020_origin'] * merged_data['GDP_2020_dest'])
-    merged_data['Log_Distance'] = np.log(merged_data['Distance'])  # Assuming distances are precomputed
-
-    # Prepare input (independent) variables and target (dependent) variable
-    X = merged_data[['Log_Population', 'Log_GDP', 'Log_Distance']]  # Independent variables
-    X = sm.add_constant(X)  # Add intercept term to the model
-    y = np.log(merged_data['Demand_2020'])  # Dependent variable (log of demand)
-
-    # Fit the model using Ordinary Least Squares (OLS)
-    model = sm.OLS(y, X).fit()
-    print(model.summary())  # Print summary of the model to verify results
-
-    return model.params  # Return the model parameters (coefficients)
+# Preview the cleaned data
+print("\nCleaned Population and GDP Data:")
+print(pop_data)
+print("\nCleaned Transposed Airport Data:")
+print(airport_data_transposed)
+print("\nCleaned Demand Per Week Data:")
+print(demand_per_week)

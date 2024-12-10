@@ -88,8 +88,6 @@ if "EDDF" in city_names:
 else:
     print("Frankfurt (EDDF) not found in city names.")
 
-
-#from here new code may be added
 # Small constant to avoid log(0)
 # Small constant to avoid log(0)
 # Zorg dat alle data geladen is
@@ -110,21 +108,20 @@ log_demand = []  # Y = ln(Dij)
 fuel_cost = 1.42
 log_fuel_cost = np.log(fuel_cost)
 
-# Loop door stadspaar (i, j)
-for i in range(num_cities):
-    for j in range(num_cities):
-        if i != j:  # Excludeer de gevallen waar i == j
-            # Bereken X1, X2, X3 en Y
-            log_pop_sum.append(np.log(pop_data.loc[i, 2020]) + np.log(pop_data.loc[j, 2020]))
-            log_gdp_sum.append(np.log(pop_data.loc[i, '2020.1']) + np.log(pop_data.loc[j, '2020.1']))
-            log_fuel_distance.append(log_fuel_cost + np.log(distance_df.iloc[i, j]))
-            log_demand.append(np.log(demand_2020[i, j]))
+# Gebruik alleen de bovenste driehoek (exclusief diagonaal)
+for i, j in zip(*np.triu_indices(num_cities, k=1)):  # Bovenste driehoek
+    # Bereken X1, X2, X3 en Y
+    log_pop_sum.append(np.log(pop_data.loc[i, 2020]) + np.log(pop_data.loc[j, 2020]))
+    log_gdp_sum.append(np.log(pop_data.loc[i, '2020.1']) + np.log(pop_data.loc[j, '2020.1']))
+    log_fuel_distance.append(log_fuel_cost + np.log(distance_df.iloc[i, j]))
+    log_demand.append(np.log(demand_2020[i, j]))
 
 # Omzetten naar NumPy arrays
 log_pop_sum = np.array(log_pop_sum)
 log_gdp_sum = np.array(log_gdp_sum)
 log_fuel_distance = np.array(log_fuel_distance)
 log_demand = np.array(log_demand)
+
 
 # Construct de design matrix X
 X = np.column_stack([
@@ -155,5 +152,49 @@ print(f"Scaling Factor k: {k}")
 print(f"Coefficient b1 (Population): {b1}")
 print(f"Coefficient b2 (GDP): {b2}")
 print(f"Coefficient b3 (Distance): {b3}")
+
+
+print(f"Demand 2020 shape: {demand_2020.shape}")
+# Haal alleen de bovenste driehoek van de matrix (exclusief de diagonaal)
+real_demand = demand_2020[np.triu_indices(20, k=1)]  # 20 is het aantal steden
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Bereken de geschatte vraagwaarden (ln(D_ij)) met het gravity model
+estimated_log_demand = (
+    beta[0] +  # ln(k)
+    beta[1] * log_pop_sum +  # b1 * ln(Pi * Pj)
+    beta[2] * log_gdp_sum +  # b2 * ln(GDPi * GDPj)
+    beta[3] * log_fuel_distance  # -b3 * ln(f * dij)
+)
+
+# Zet de geschatte vraagwaarden terug naar originele schaal
+estimated_demand = np.exp(estimated_log_demand)
+
+# Controleer de shapes van real_demand en estimated_demand
+print(f"Real Demand shape: {real_demand.shape}")
+print(f"Estimated Demand shape: {estimated_demand.shape}")
+
+# Zorg ervoor dat beide arrays dezelfde lengte hebben
+if real_demand.shape != estimated_demand.shape:
+    raise ValueError("De shapes van real_demand en estimated_demand komen niet overeen.")
+
+# Plot de werkelijke vraag versus de geschatte vraag
+plt.figure(figsize=(10, 6))
+plt.scatter(real_demand, estimated_demand, alpha=0.7, color='blue', label="Geschatte vraag")
+plt.plot(
+    [0, max(real_demand.max(), estimated_demand.max())], 
+    [0, max(real_demand.max(), estimated_demand.max())], 
+    color='red', linestyle='--', label="Perfecte lijn (y=x)"
+)
+
+
+plt.title("Vergelijking van Werkelijke en Geschatte Vraag (2020)")
+plt.xlabel("Werkelijke Vraag (D_ij)")
+plt.ylabel("Geschatte Vraag (D_ij)")
+plt.legend()
+plt.grid(True)
+plt.show()
 
 

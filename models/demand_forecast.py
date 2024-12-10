@@ -89,5 +89,71 @@ else:
     print("Frankfurt (EDDF) not found in city names.")
 
 
+#from here new code may be added
+# Small constant to avoid log(0)
+# Small constant to avoid log(0)
+# Zorg dat alle data geladen is
+# Zorg dat alle data geladen is
+# Zorg dat alle data geladen is
+demand_2020 = demand_per_week.values  # Vraag D_ij als NumPy-array
 
-    
+# Extract aantal steden
+num_cities = len(pop_data)
+
+# Lijsten voorbereiden
+log_pop_sum = []  # X1 = ln(Pi) + ln(Pj)
+log_gdp_sum = []  # X2 = ln(GDPi) + ln(GDPj)
+log_fuel_distance = []  # X3 = ln(f) + ln(dij)
+log_demand = []  # Y = ln(Dij)
+
+# Brandstofkosten
+fuel_cost = 1.42
+log_fuel_cost = np.log(fuel_cost)
+
+# Loop door stadspaar (i, j)
+for i in range(num_cities):
+    for j in range(num_cities):
+        if i != j:  # Excludeer de gevallen waar i == j
+            # Bereken X1, X2, X3 en Y
+            log_pop_sum.append(np.log(pop_data.loc[i, 2020]) + np.log(pop_data.loc[j, 2020]))
+            log_gdp_sum.append(np.log(pop_data.loc[i, '2020.1']) + np.log(pop_data.loc[j, '2020.1']))
+            log_fuel_distance.append(log_fuel_cost + np.log(distance_df.iloc[i, j]))
+            log_demand.append(np.log(demand_2020[i, j]))
+
+# Omzetten naar NumPy arrays
+log_pop_sum = np.array(log_pop_sum)
+log_gdp_sum = np.array(log_gdp_sum)
+log_fuel_distance = np.array(log_fuel_distance)
+log_demand = np.array(log_demand)
+
+# Construct de design matrix X
+X = np.column_stack([
+    np.ones(len(log_demand)),  # Intercept term (C = ln(k))
+    log_pop_sum,  # X1
+    log_gdp_sum,  # X2
+    log_fuel_distance  # X3
+])
+
+# Afhankelijke variabele Y
+y = log_demand
+
+# Bereken beta met de OLS-formule
+XT_X = np.dot(X.T, X)  # X'X
+XT_y = np.dot(X.T, y)  # X'y
+beta = np.linalg.inv(XT_X).dot(XT_y)  # (X'X)^(-1)X'y
+
+# Coëfficiënten interpreteren
+ln_k = beta[0]  # Intercept
+k = np.exp(ln_k)  # Omrekenen naar originele schaal
+b1 = beta[1]  # Coëfficiënt voor populatie
+b2 = beta[2]  # Coëfficiënt voor GDP
+b3 = -beta[3]  # Negatief vanwege de formule
+
+# Resultaten printen
+print("Calibratie Resultaten:")
+print(f"Scaling Factor k: {k}")
+print(f"Coefficient b1 (Population): {b1}")
+print(f"Coefficient b2 (GDP): {b2}")
+print(f"Coefficient b3 (Distance): {b3}")
+
+

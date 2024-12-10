@@ -256,3 +256,5 @@ output_population_gdp_file = "Population_and_GDP_2025.xlsx"
 forecasted_data.to_excel(output_population_gdp_file)
 
 print(f"\nPopulation and GDP for 2025 saved to {output_population_gdp_file}.")
+
+print('test jelle')

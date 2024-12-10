@@ -198,3 +198,34 @@ plt.grid(True)
 plt.show()
 
 
+#vanaf hier verder coderen
+
+
+# Average Annual Growth calculation
+pop_data['AAG_Population'] = (pop_data[2023] / pop_data[2020]) ** (1/3) - 1
+pop_data['AAG_GDP'] = (pop_data['2023.1'] / pop_data['2020.1']) ** (1/3) - 1
+
+# Forecast for 2025
+pop_data[2025] = (pop_data[2023] * (1 + pop_data['AAG_Population'])).round(0).astype(int)
+pop_data['2025.1'] = (pop_data['2023.1'] * (1 + pop_data['AAG_GDP'])).round(0).astype(int)
+
+print("Forecasted Population and GDP for 2025 (rounded):")
+print(pop_data[[2025, '2025.1']])
+
+# Future demand (exponential growth)
+AAG_demand = ((demand_per_week.values.sum(axis=0)[1] / demand_per_week.values.sum(axis=0)[0]) ** (1/3)) - 1
+future_demand = (demand_per_week.values * ((1 + AAG_demand) ** 5)).round(0).astype(int)
+
+# Zet de gegenereerde vraag om in een DataFrame
+city_names = demand_per_week.columns  # Neem de stadnamen uit de originele dataset
+future_demand_df = pd.DataFrame(future_demand, index=city_names, columns=city_names)
+
+# Voeg rijnamen toe voor extra duidelijkheid
+future_demand_df.index.name = "Origin"
+future_demand_df.columns.name = "Destination"
+
+# Save to Excel for better visualization
+output_file = "Future_Demand_2025.xlsx"
+future_demand_df.to_excel(output_file)
+
+print(f"Generated Demand for 2025 saved to {output_file}")

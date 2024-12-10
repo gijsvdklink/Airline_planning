@@ -246,3 +246,13 @@ output_file = "Future_Demand_2025_with_Gravity_Model.xlsx"
 future_demand_df.to_excel(output_file)
 
 print(f"\nFuture demand for 2025 calculated and saved to {output_file}.")
+# Print de voorspelde populatie en GDP voor 2025 per stad
+print("\nForecasted Population and GDP for 2025 per City:")
+forecasted_data = pop_data[[2025, '2025.1']].rename(columns={2025: 'Population_2025', '2025.1': 'GDP_2025'})
+print(forecasted_data)
+
+# Opslaan als Excel voor presentatie
+output_population_gdp_file = "Population_and_GDP_2025.xlsx"
+forecasted_data.to_excel(output_population_gdp_file)
+
+print(f"\nPopulation and GDP for 2025 saved to {output_population_gdp_file}.")

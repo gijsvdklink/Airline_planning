@@ -1,7 +1,9 @@
 from gurobipy import *
 from utils.distance_calculations import calculate_distance
+from demand_forecast import #definitiion demand 2025
 # Data
-Distance  = calculate_distance(lat1, lon1, lat2, lon2)
+demand_matrix = #definitiion demand 2025
+Distance_matrix  = calculate_distance(lat1, lon1, lat2, lon2)
 Airports = ['C4', 'D4', 'E4', 'F4', 'G4', 'H4', 'I4', 'J4', 'K4', 'L4', 'M4', 'N4', 'O4', 'P4', 'Q4', 'R4', 'S4', 'T4', 'U4', 'V4']
 airports = range(len(Airports))
 CASK = 0.12
@@ -11,29 +13,9 @@ sp = 870
 LTO = 20/60
 BT = 10 * 7
 AC = 2
-# yield #yield_matrix = [[5.9 * (distance[i][j] ** -0.76) + 0.043
- # Path to the spreadsheet file
-file_path = 'data/DemandGroup16.xlsx'
-
-# Load the workbook and select the active sheet
-wb = openpyxl.load_workbook(file_path)
-sheet = wb.active  # Use `wb['SheetName']` if you want a specific sheet
-
-# Define the range of cells containing the matrix
-start_row, start_col = 13, 3  # C13 (row 13, column 3)
-end_row, end_col = 32, 22    # V32 (row 32, column 22)
-
-# Extract the matrix into a 2D Python list
-matrix = []
-for row in sheet.iter_rows(min_row=start_row, max_row=end_row, min_col=start_col, max_col=end_col, values_only=True):
-    matrix.append(list(row))
-
-# Print the extracted matrix
-for row in matrix:
-    print(row)
-y = matrix[]
-q = Forecast demand file
-distance =  Distance
+y = 5.9 * (Distance_matrix[i][j] ** -0.76) + 0.043
+q = demand_matrix
+distance =  Distance_matrix
 # Start modelling optimization problem
 m = Model('practice')
 x = {}
@@ -46,7 +28,7 @@ for i in airports:
 m.update()
 profit = quicksum(y * distance[i][j] * x[i, j] for i in airports for j in airports) - \
          quicksum(CASK * distance[i][j] * s * z[i, j] for i in airports for j in airports)
-m.setObjective(m.getObjective(profit), GRB.MAXIMIZE)  # The objective is to maximize profit
+(m.getObjective(profit), GRB.MAXIMIZE)  # The objective is to maximize profit
 
 for i in airports:
     for j in airports:

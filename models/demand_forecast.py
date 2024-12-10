@@ -205,40 +205,43 @@ plt.show()
 pop_data['AAG_Population'] = (pop_data[2023] / pop_data[2020]) ** (1/3) - 1
 pop_data['AAG_GDP'] = (pop_data['2023.1'] / pop_data['2020.1']) ** (1/3) - 1
 
+# Forecast population and GDP for 2025
 pop_data[2025] = (pop_data[2023] * (1 + pop_data['AAG_Population'])).round(0).astype(int)
 pop_data['2025.1'] = (pop_data['2023.1'] * (1 + pop_data['AAG_GDP'])).round(0).astype(int)
 
-# Bereken toekomstige vraag (future demand) met het gravity model
+# Future demand calculation using the gravity model
 future_demand = np.zeros((num_cities, num_cities))
 
 for i in range(num_cities):
     for j in range(num_cities):
-        if i != j:  # Geen zelf-lussen
+        if i != j:  # Skip self-loops
             pop_i = pop_data.loc[i, 2025]
             pop_j = pop_data.loc[j, 2025]
             gdp_i = pop_data.loc[i, '2025.1']
             gdp_j = pop_data.loc[j, '2025.1']
             distance = distance_df.iloc[i, j]
 
-            # Gebruik het gravity model
-            future_demand[i, j] = k * ((pop_i * pop_j) ** b1) * ((gdp_i * gdp_j) ** b2) / (distance ** b3)
+            # Incorporate fuel costs into the gravity model
+            future_demand[i, j] = (
+                k * ((pop_i * pop_j) ** b1) * ((gdp_i * gdp_j) ** b2) / ((fuel_cost * distance) ** b3)
+            )
 
-# Rond de vraagwaarden af naar gehele getallen
+# Round the demand values to integers
 future_demand = np.round(future_demand).astype(int)
 
-# Zet de vraagwaarden om in een DataFrame
-city_names = distance_df.index  # Stedenamen van distance_df
+# Convert future demand to a DataFrame
+city_names = distance_df.index  # City names from distance_df
 future_demand_df = pd.DataFrame(future_demand, index=city_names, columns=city_names)
 
-# Voeg rijnamen en kolomnamen toe
+# Add row and column names
 future_demand_df.index.name = "Origin"
 future_demand_df.columns.name = "Destination"
 
-# Print de toekomstige vraag in de terminal
+# Print the future demand in the terminal
 print("\nFuture Demand for 2025 (Terminal Output):")
 print(future_demand_df)
 
-# Opslaan in Excel voor presentatie
+# Save to Excel for presentation
 output_file = "Future_Demand_2025_with_Gravity_Model.xlsx"
 future_demand_df.to_excel(output_file)
 

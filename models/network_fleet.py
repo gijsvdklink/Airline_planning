@@ -13,25 +13,9 @@ BT = 10 * 7
 AC = 2
 # yield #yield_matrix = [[5.9 * (distance[i][j] ** -0.76) + 0.043
  # Path to the spreadsheet file
-file_path = 'data/DemandGroup16.xlsx'
 
-# Load the workbook and select the active sheet
-wb = openpyxl.load_workbook(file_path)
-sheet = wb.active  # Use `wb['SheetName']` if you want a specific sheet
-
-# Define the range of cells containing the matrix
-start_row, start_col = 13, 3  # C13 (row 13, column 3)
-end_row, end_col = 32, 22    # V32 (row 32, column 22)
-
-# Extract the matrix into a 2D Python list
-matrix = []
-for row in sheet.iter_rows(min_row=start_row, max_row=end_row, min_col=start_col, max_col=end_col, values_only=True):
-    matrix.append(list(row))
-
-# Print the extracted matrix
-for row in matrix:
-    print(row)
-y = matrix[]
+y() = file_path = "utils/Future_Demand_2025_with_Gravity_Model.xlsx"  # Adjust the path as needed
+future_demand_data = pd.read_excel(file_path)
 q = Forecast demand file
 distance =  Distance
 # Start modelling optimization problem

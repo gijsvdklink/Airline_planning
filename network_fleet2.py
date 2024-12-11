@@ -33,14 +33,11 @@ MAX_HOURS_PER_WEEK = HOURS_PER_DAY * DAYS_PER_WEEK
 model = Model("Network_Fleet_Optimization")
 
 # Decision variables
-flight_vars = model.addVars(
-    demand_data.index, demand_data.columns, aircraft_data.index, vtype=GRB.INTEGER, name="FlightFrequency"
-)
+flight_vars = model.addVars(demand_data.index, demand_data.columns, aircraft_data.index, vtype=GRB.INTEGER, name="FlightFrequency")
 aircraft_vars = model.addVars(aircraft_data.index, vtype=GRB.INTEGER, name="NumAircraft")
 
 # Objective function: Maximize profit
-revenue = quicksum(
-    flight_vars[i, j, k] * 
+revenue = quicksum(flight_vars[i, j, k] * 
     (5.9 * (distance_data.loc[i, j] ** -0.76) + 0.043) * 
     distance_data.loc[i, j] * aircraft_data.loc[k, 'Seats'] * LOAD_FACTOR
     for i in demand_data.index for j in demand_data.columns if i != j for k in aircraft_data.index

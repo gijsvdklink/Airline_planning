@@ -1,116 +1,129 @@
+from gurobipy import Model, GRB, quicksum
 import pandas as pd
 import numpy as np
-from gurobipy import Model, GRB, quicksum
-
-# Load demand data (from Assignment 1A)
-demand_data = pd.read_excel('Future_Demand_2025_with_Gravity_Model.xlsx', index_col=0)
-
-# Load distance data
-distance_data = pd.read_csv('distance_matrix_with_city_names.csv', index_col=0)
-
-# Aircraft data from Appendix D
-aircraft_data = pd.DataFrame({
-    'Type': ['Aircraft 1', 'Aircraft 2', 'Aircraft 3', 'Aircraft 4'],
-    'Seats': [45, 70, 150, 320],
-    'Max_Range': [1500, 3300, 6300, 12000],
-    'Lease_Cost': [15000, 34000, 80000, 190000],
-    'Fixed_Cost': [300, 600, 1250, 2000],
-    'Time_Cost': [750, 775, 1400, 2800],
-    'Fuel_Cost': [1.0, 2.0, 3.75, 9.0],
-    'TAT': [25, 35, 45, 60],  # Turnaround time in minutes
-    'Speed': [550, 820, 850, 870],  # Speed in km/h
-})
-aircraft_data.set_index('Type', inplace=True)
 
 # Constants
-LOAD_FACTOR = 0.75  # 75% average load factor
-FUEL_COST = 1.42  # Fuel cost per gallon in EUR
+LOAD_FACTOR = 0.75
+HUB_ECONOMIES = 0.7
 HOURS_PER_DAY = 10
 DAYS_PER_WEEK = 7
-MAX_HOURS_PER_WEEK = HOURS_PER_DAY * DAYS_PER_WEEK
+BLOCK_TIME = HOURS_PER_DAY * DAYS_PER_WEEK  # Weekly available block time
+FUEL_COST = 1.42  # EUR/gallon
 
-# Create the optimization model
-model = Model("Network_Fleet_Optimization")
+# Aircraft data
+aircraft_data = {
+    "Aircraft 1": {"speed": 550, "seats": 45, "lease": 15000, "CX": 300, "CT": 750, "CF": 1.0, "range": 1500},
+    "Aircraft 2": {"speed": 820, "seats": 70, "lease": 34000, "CX": 600, "CT": 775, "CF": 2.0, "range": 3300},
+    "Aircraft 3": {"speed": 850, "seats": 150, "lease": 80000, "CX": 1250, "CT": 1400, "CF": 3.75, "range": 6300},
+    "Aircraft 4": {"speed": 870, "seats": 320, "lease": 190000, "CX": 2000, "CT": 2800, "CF": 9.0, "range": 12000},
+}
 
-# Decision variables
-flight_vars = model.addVars(demand_data.index, demand_data.columns, aircraft_data.index, vtype=GRB.INTEGER, name="FlightFrequency")
-aircraft_vars = model.addVars(aircraft_data.index, vtype=GRB.INTEGER, name="NumAircraft")
+# File paths
+distance_file = "distance_matrix_with_city_names.csv"
+demand_file = "Future_Demand_2025_with_Gravity_Model.xlsx"
+
+# Load data
+distance_df = pd.read_csv(distance_file, index_col=0)
+demand_df = pd.read_excel(demand_file, index_col=0)
+
+# Debug: Check if input data is valid
+print("\nDistance Matrix:\n", distance_df)
+print("\nDemand Matrix:\n", demand_df)
+
+# Yield calculation
+def calculate_yield(distance):
+    if distance == 0:
+        return 0  # Handle zero distances
+    return 5.9 * distance ** -0.76 + 0.043
+
+# Calculate yields
+yields = distance_df.applymap(calculate_yield)
+
+# Create the Gurobi model
+model = Model("Network_and_Fleet_Development")
+
+# Variables
+x = {}  # Passenger flow
+z = {}  # Flight frequency
+ac_lease = {}  # Number of leased aircraft per type
+
+for origin in demand_df.index:
+    for destination in demand_df.columns:
+        if origin != destination:
+            x[origin, destination] = model.addVar(vtype=GRB.CONTINUOUS, lb=0, name=f"x_{origin}_{destination}")
+            z[origin, destination] = model.addVar(vtype=GRB.INTEGER, lb=0, name=f"z_{origin}_{destination}")
+
+for aircraft_type in aircraft_data.keys():
+    ac_lease[aircraft_type] = model.addVar(vtype=GRB.INTEGER, lb=0, name=f"ac_lease_{aircraft_type}")
+
+model.update()
 
 # Objective function: Maximize profit
-revenue = quicksum(flight_vars[i, j, k] * 
-    (5.9 * (distance_data.loc[i, j] ** -0.76) + 0.043) * 
-    distance_data.loc[i, j] * aircraft_data.loc[k, 'Seats'] * LOAD_FACTOR
-    for i in demand_data.index for j in demand_data.columns if i != j for k in aircraft_data.index
+model.setObjective(
+    quicksum(
+        yields.loc[o, d] * distance_df.loc[o, d] * x[o, d]
+        - quicksum(
+            (
+                aircraft_data[a]["CX"]
+                + (aircraft_data[a]["CT"] * distance_df.loc[o, d] / aircraft_data[a]["speed"])
+                + (aircraft_data[a]["CF"] * FUEL_COST ** 1.5 * distance_df.loc[o, d])
+            )
+            * z[o, d]
+            for a in aircraft_data.keys()
+        )
+        - quicksum(aircraft_data[a]["lease"] * ac_lease[a] for a in aircraft_data.keys())
+        for o in demand_df.index
+        for d in demand_df.columns
+        if o != d
+    ),
+    GRB.MAXIMIZE,
 )
-
-lease_costs = quicksum(
-    aircraft_vars[k] * aircraft_data.loc[k, 'Lease_Cost']
-    for k in aircraft_data.index
-)
-
-operating_costs = quicksum(
-    flight_vars[i, j, k] * (
-        aircraft_data.loc[k, 'Fixed_Cost'] +
-        (aircraft_data.loc[k, 'Time_Cost'] * (distance_data.loc[i, j] / aircraft_data.loc[k, 'Speed'])) +
-        (aircraft_data.loc[k, 'Fuel_Cost'] * (FUEL_COST ** 1.5) * distance_data.loc[i, j])
-    )
-    for i in demand_data.index for j in demand_data.columns if i != j for k in aircraft_data.index
-)
-
-total_costs = lease_costs + operating_costs
-model.setObjective(revenue - total_costs, GRB.MAXIMIZE)
 
 # Constraints
-# 1. Demand satisfaction
-for i in demand_data.index:
-    for j in demand_data.columns:
-        if i != j and demand_data.loc[i, j] > 0:
-            total_capacity = quicksum(
-                flight_vars[i, j, k] * aircraft_data.loc[k, 'Seats'] * LOAD_FACTOR
-                for k in aircraft_data.index
+for origin in demand_df.index:
+    for destination in demand_df.columns:
+        if origin != destination:
+            # Demand constraint
+            model.addConstr(
+                x[origin, destination] <= demand_df.loc[origin, destination] * LOAD_FACTOR, f"demand_{origin}_{destination}"
             )
-            model.addConstr(total_capacity >= demand_data.loc[i, j], name=f"Demand_{i}_{j}")
+            # Capacity constraint
+            model.addConstr(
+                x[origin, destination] <= quicksum(
+                    aircraft_data[a]["seats"] * z[origin, destination] for a in aircraft_data.keys()
+                ),
+                f"capacity_{origin}_{destination}",
+            )
 
-# 2. Aircraft utilization
-for k in aircraft_data.index:
-    total_flight_hours = quicksum(
-        flight_vars[i, j, k] * (
-            (distance_data.loc[i, j] / aircraft_data.loc[k, 'Speed']) +
-            (aircraft_data.loc[k, 'TAT'] / 60)  # Convert TAT to hours
+# Aircraft productivity constraint
+for aircraft_type, data in aircraft_data.items():
+    model.addConstr(
+        quicksum(
+            (distance_df.loc[o, d] / data["speed"] + data["CX"] / 60) * z[o, d]
+            for o in demand_df.index
+            for d in demand_df.columns
+            if o != d
         )
-        for i in demand_data.index for j in demand_data.columns if i != j
+        <= BLOCK_TIME * ac_lease[aircraft_type],
+        f"productivity_{aircraft_type}",
     )
-    model.addConstr(total_flight_hours <= aircraft_vars[k] * MAX_HOURS_PER_WEEK, name=f"Utilization_{k}")
 
-# 3. Range constraint
-for i in demand_data.index:
-    for j in demand_data.columns:
-        if i != j and distance_data.loc[i, j] > 0:
-            for k in aircraft_data.index:
-                model.addConstr(
-                    flight_vars[i, j, k] * distance_data.loc[i, j] <= 
-                    flight_vars[i, j, k] * aircraft_data.loc[k, 'Max_Range'],
-                    name=f"Range_{i}_{j}_{k}"
-                )
+model.update()
 
 # Solve the model
 model.optimize()
 
-# Print the results
+# Debug: Display variable values
 if model.status == GRB.OPTIMAL:
-    print(f"Optimal Profit: €{model.objVal:,.2f}")
-    print("\nAircraft to Lease:")
-    for k in aircraft_data.index:
-        num_ac = aircraft_vars[k].X
-        if num_ac > 0:
-            print(f" - {k}: {int(num_ac)} aircraft")
-    print("\nFlight Schedule:")
-    for i in demand_data.index:
-        for j in demand_data.columns:
-            if i != j:
-                for k in aircraft_data.index:
-                    freq = flight_vars[i, j, k].X
-                    if freq > 0:
-                        print(f" - From {i} to {j} with {k}: {int(freq)} flights per week")
+    print("\nOptimal Solution Found:")
+    print("Profit:", model.objVal)
+    print("\nFlight Frequencies:")
+    for o, d in z.keys():
+        if z[o, d].x > 0:
+            print(f"Route {o} -> {d}: {z[o, d].x} flights")
+    print("\nLeased Aircraft:")
+    for a in ac_lease.keys():
+        if ac_lease[a].x > 0:
+            print(f"{a}: {ac_lease[a].x} aircraft")
 else:
     print("No optimal solution found.")

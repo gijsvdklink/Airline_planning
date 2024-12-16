@@ -1,0 +1,8 @@
+\ Model Fleet_and_Network_Planning_copy
+\ LP format - for model browsing. Use MPS format to capture full model detail.
+Maximize
+ 
+Subject To
+ RunwayReq_Aircraft_4_EPWA: <= -1
+Bounds
+End
